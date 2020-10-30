@@ -89,7 +89,7 @@ gst_src_init(int *argc, char ***argv, char *pipeline)
 	GstBus *bus;
 	char pipeline_str[MAX_PIPELINE_LEN];
 
-	snprintf(pipeline_str, MAX_PIPELINE_LEN, "appsrc name=ap ! queue ! h264parse ! queue ! %s ", pipeline);
+	snprintf(pipeline_str, MAX_PIPELINE_LEN, "appsrc name=ap ! queue ! h264parse ! video/x-h264,stream-format=byte-stream,alignment=au ! queue ! %s ", pipeline);
 
 	gst_init(argc, argv);
 	src.timer = g_timer_new();
@@ -124,6 +124,8 @@ keywait(void *arg)
 	read(1, keyin, 1);
 
 	s = (struct gst_src *)arg;
+	// send EOS event 
+	gst_element_send_event(s->pipeline, gst_event_new_eos());
 	g_main_loop_quit(s->loop);
 
 }
@@ -185,11 +187,15 @@ main(int argc, char **argv)
 		cmd_name++;
 
 	if (strcmp(cmd_name, "gst_loopback") == 0)
-		pipe_proc = "decodebin ! autovideoconvert ! "
-			"video/x-raw,format=I420 ! identity drop-allocation=true !"
-			"v4l2sink device=/dev/video1 sync=false";
+		pipe_proc = "decodebin  ! videoconvert ! "
+//			"videoscale ! video/x-raw, width=1920,height=960 ! "
+			"v4l2sink async=false device=/dev/video0 qos=false sync=false";
+//	else  {
+//		fprintf(stderr, "dump...\n");
+//		pipe_proc = "filesink location=dump.h264";
+//	}
 	else
-		pipe_proc = " decodebin ! autovideosink sync=false";
+		pipe_proc = " decodebin ! autovideosink qos=false sync=false";
 
 	if (!gst_src_init(&argc, &argv, pipe_proc))
 		return -1;
