@@ -31,21 +31,19 @@
 
 
 PKG_CONFIG_LIB = gstreamer-app-1.0 libuvc
-
-CFLAGS += $(shell pkg-config --cflags $(PKG_CONFIG_LIB))
-LDFLAGS += $(shell pkg-config --libs $(PKG_CONFIG_LIB))
+CFLAGS += -fPIC $(shell pkg-config --cflags $(PKG_CONFIG_LIB))
+LDFLAGS += -shared $(shell pkg-config --libs $(PKG_CONFIG_LIB))
 
 SRCS = gst_viewer.c thetauvc.c
 OBJS := $(SRCS:.c=.o)
-EXES = gst_viewer gst_loopback
+EXES = $(OUTPATH)liblauncher.so 
 
 all: $(EXES)
 
-gst_viewer: $(OBJS)
+$(OUTPATH)liblauncher.so : $(OBJS)
+	@mkdir -p $(OUTPATH)
 	$(CC) $(OBJS) -o $@  $(LDFLAGS) -pthread
-
-gst_loopback: gst_viewer
-	ln -sf $< $@
+	@cp theta_launch.h $(OUTPATH)
 
 clean:
-	@$(RM) $(OBJS) $(EXES)
+	@$(RM) $(OBJS) $(EXES) $(OUTPATH)theta_launch.h

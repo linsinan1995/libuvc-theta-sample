@@ -41,6 +41,7 @@
 
 #include "libuvc/libuvc.h"
 #include "thetauvc.h"
+#include "theta_launch.h"
 
 #define MAX_PIPELINE_LEN 1024
 
@@ -83,31 +84,22 @@ gst_bus_cb(GstBus *bus, GstMessage *message, gpointer data)
 
 
 int
-gst_src_init(int *argc, char ***argv, char *pipeline)
+gst_src_init(int *argc, char ***argv, char *pipeline, char *appsrc_alias)
 {
 	GstCaps *caps;
 	GstBus *bus;
-	char pipeline_str[MAX_PIPELINE_LEN];
-
-	snprintf(pipeline_str, MAX_PIPELINE_LEN, "appsrc name=ap ! queue ! h264parse ! video/x-h264,stream-format=byte-stream,alignment=au ! queue ! %s ", pipeline);
 
 	gst_init(argc, argv);
 	src.timer = g_timer_new();
 	src.loop = g_main_loop_new(NULL, TRUE);
-	src.pipeline = gst_parse_launch(pipeline_str, NULL);
+	src.pipeline = gst_parse_launch(pipeline, NULL);
 
 	g_assert(src.pipeline);
 	if (src.pipeline == NULL)
 		return FALSE;
 	gst_pipeline_set_clock(GST_PIPELINE(src.pipeline), gst_system_clock_obtain());
 
-	src.appsrc = gst_bin_get_by_name(GST_BIN(src.pipeline), "ap");
-
-	caps = gst_caps_new_simple("video/x-h264",
-		"framerate", GST_TYPE_FRACTION, 30000, 1001,
-		"stream-format", G_TYPE_STRING, "byte-stream",
-		"profile", G_TYPE_STRING, "constrained-baseline", NULL);
-	gst_app_src_set_caps(GST_APP_SRC(src.appsrc), caps);
+	src.appsrc = gst_bin_get_by_name(GST_BIN(src.pipeline), appsrc_alias);
 
 	bus = gst_pipeline_get_bus(GST_PIPELINE(src.pipeline));
 	src.bus_watch_id = gst_bus_add_watch(bus, gst_bus_cb, NULL);
@@ -163,7 +155,7 @@ cb(uvc_frame_t *frame, void *ptr)
 }
 
 int
-main(int argc, char **argv)
+launch(int argc, char **argv, char *pipe_proc, char *appsrc_alias)
 {
 	uvc_context_t *ctx;
 	uvc_device_t *dev;
@@ -177,27 +169,8 @@ main(int argc, char **argv)
 
 	struct gst_src *s;
 	int idx;
-	char *pipe_proc;
-	char *cmd_name;
 
-	cmd_name = rindex(argv[0], '/');
-	if (cmd_name == NULL)
-		cmd_name = argv[0];
-	else
-		cmd_name++;
-
-	if (strcmp(cmd_name, "gst_loopback") == 0)
-		pipe_proc = "decodebin  ! videoconvert ! "
-//			"videoscale ! video/x-raw, width=1920,height=960 ! "
-			"v4l2sink async=false device=/dev/video0 qos=false sync=false";
-//	else  {
-//		fprintf(stderr, "dump...\n");
-//		pipe_proc = "filesink location=dump.h264";
-//	}
-	else
-		pipe_proc = " decodebin ! autovideosink qos=false sync=false";
-
-	if (!gst_src_init(&argc, &argv, pipe_proc))
+	if (!gst_src_init(&argc, &argv, pipe_proc, appsrc_alias))
 		return -1;
 
 	res = uvc_init(&ctx, NULL);
