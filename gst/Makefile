@@ -28,7 +28,7 @@
 #   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 #   POSSIBILITY OF SUCH DAMAGE.
 # 
-
+default: libtheta_launcher
 
 PKG_CONFIG_LIB = gstreamer-app-1.0 libuvc
 CFLAGS += -fPIC $(shell pkg-config --cflags $(PKG_CONFIG_LIB))
@@ -36,14 +36,16 @@ LDFLAGS += -shared $(shell pkg-config --libs $(PKG_CONFIG_LIB))
 
 SRCS = gst_viewer.c thetauvc.c
 OBJS := $(SRCS:.c=.o)
-EXES = $(OUTPATH)liblauncher.so 
 
 all: $(EXES)
 
-$(OUTPATH)liblauncher.so : $(OBJS)
-	@mkdir -p $(OUTPATH)
-	$(CC) $(OBJS) -o $@  $(LDFLAGS) -pthread
-	@cp theta_launch.h $(OUTPATH)
+libtheta_launcher.so : $(OBJS)
+	$(CC) -O3 $(OBJS) -o $@ $(LDFLAGS) -pthread
 
+libtheta_launcher: libtheta_launcher.so
+	python3 setup.py build_ext --inplace && rm -f pytheta.c
+	mkdir -p $(OUTPATH)
+	cp *.so $(OUTPATH)/
 clean:
-	@$(RM) $(OBJS) $(EXES) $(OUTPATH)theta_launch.h
+	@$(RM) $(OBJS) $(EXES) *.so
+	@$(RM) -rf $(PWD)/build

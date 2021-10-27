@@ -41,7 +41,7 @@
 
 #include "libuvc/libuvc.h"
 #include "thetauvc.h"
-#include "theta_launch.h"
+#include "launcher.h"
 
 #define MAX_PIPELINE_LEN 1024
 
@@ -82,7 +82,6 @@ gst_bus_cb(GstBus *bus, GstMessage *message, gpointer data)
 	return TRUE;
 }
 
-
 int
 gst_src_init(int *argc, char ***argv, char *pipeline, char *appsrc_alias)
 {
@@ -105,21 +104,6 @@ gst_src_init(int *argc, char ***argv, char *pipeline, char *appsrc_alias)
 	src.bus_watch_id = gst_bus_add_watch(bus, gst_bus_cb, NULL);
 	gst_object_unref(bus);
 	return TRUE;
-}
-
-void *
-keywait(void *arg)
-{
-	struct gst_src *s;
-	char keyin[4];
-
-	read(1, keyin, 1);
-
-	s = (struct gst_src *)arg;
-	// send EOS event 
-	gst_element_send_event(s->pipeline, gst_event_new_eos());
-	g_main_loop_quit(s->loop);
-
 }
 
 void
@@ -155,7 +139,7 @@ cb(uvc_frame_t *frame, void *ptr)
 }
 
 int
-launch(int argc, char **argv, char *pipe_proc, char *appsrc_alias)
+launch_internal(const char *pipe_proc, const char *appsrc_alias, const char *serial_number)
 {
 	uvc_context_t *ctx;
 	uvc_device_t *dev;
@@ -170,7 +154,7 @@ launch(int argc, char **argv, char *pipe_proc, char *appsrc_alias)
 	struct gst_src *s;
 	int idx;
 
-	if (!gst_src_init(&argc, &argv, pipe_proc, appsrc_alias))
+	if (!gst_src_init(NULL, NULL, strdup(pipe_proc), strdup(appsrc_alias)))
 		return -1;
 
 	res = uvc_init(&ctx, NULL);
@@ -179,36 +163,8 @@ launch(int argc, char **argv, char *pipe_proc, char *appsrc_alias)
 		return res;
 	}
 
-	if (argc > 1 && strcmp("-l", argv[1]) == 0) {
-		res = thetauvc_find_devices(ctx, &devlist);
-		if (res != UVC_SUCCESS) {
-			uvc_perror(res,"");
-			uvc_exit(ctx);
-			return res;
-		}
-
-		idx = 0;
-		printf("No : %-18s : %-10s\n", "Product", "Serial");
-		while (devlist[idx] != NULL) {
-			uvc_device_descriptor_t *desc;
-
-			if (uvc_get_device_descriptor(devlist[idx], &desc) != UVC_SUCCESS)
-				continue;
-
-			printf("%2d : %-18s : %-10s\n", idx, desc->product,
-				desc->serialNumber);
-
-			uvc_free_device_descriptor(desc);
-			idx++;
-		}
-
-		uvc_free_device_list(devlist, 1);
-		uvc_exit(ctx);
-		exit(0);
-	}
-
 	src.framecount = 0;
-	res = thetauvc_find_device(ctx, &dev, 0);
+	res = thetauvc_find_device_by_serial(ctx, &dev, serial_number);
 	if (res != UVC_SUCCESS) {
 		fprintf(stderr, "THETA not found\n");
 		goto exit;
@@ -221,7 +177,6 @@ launch(int argc, char **argv, char *pipe_proc, char *appsrc_alias)
 	}
 
 	gst_element_set_state(src.pipeline, GST_STATE_PLAYING);
-	pthread_create(&thr, NULL, keywait, &src);
 	
 	res = thetauvc_get_stream_ctrl_format_size(devh,
 			THETAUVC_MODE_UHD_2997, &ctrl);

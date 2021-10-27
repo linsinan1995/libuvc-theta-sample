@@ -51,7 +51,8 @@ extern uvc_error_t thetauvc_get_stream_ctrl_format_size(uvc_device_handle_t *,
 	       	unsigned int, uvc_stream_ctrl_t *);
 extern uvc_error_t thetauvc_run_streaming(uvc_device_t *, uvc_device_handle_t **,
 	unsigned int, uvc_frame_callback_t *, void *);
-
+extern uvc_error_t thetauvc_find_device_by_serial(uvc_context_t *ctx, uvc_device_t **devh,
+	const char *serial);
 
 #if defined(__cplsplus)
 }
